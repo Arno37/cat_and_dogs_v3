@@ -53,7 +53,7 @@ services:
     # Alpine = distribution Linux ultra-légère (~5MB vs ~100MB pour Debian)
     # Idéal pour conteneurs (démarrage rapide, moins de surface d'attaque)
     
-    container_name: cv_postgres_${STUDENT_ID:-student01}
+    container_name: cv_postgres_${STUDENT_ID:-student02}
     # 💡 Nom fixe du conteneur (facilite les logs et le debugging)
     # Sans cela, Docker génère un nom aléatoire (ex: cv_v3_postgres_1)
     
@@ -65,8 +65,8 @@ services:
     # - no : pas de redémarrage automatique (dev uniquement)
     
     env_file:
-      - ../.env
-    # 📁 Charge les variables d'environnement depuis .env (un niveau au-dessus)
+      - ./.env
+    # 📁 Charge les variables d'environnement depuis .env (même dossier)
     # Bonne pratique : séparer secrets (.env, gitignored) et configuration (docker-compose)
     
     environment:
@@ -74,7 +74,7 @@ services:
       # Syntaxe : ${VARIABLE:-valeur_par_defaut}
       # Ordre de priorité : 1) .env, 2) valeur par défaut, 3) variable système
       
-      POSTGRES_DB: ${DB_NAME:-cats_dogs_db}_${STUDENT_ID:-student01}
+      POSTGRES_DB: ${DB_NAME:-cats_dogs_db}_${STUDENT_ID:-student02}
       # 💡 Nom de la base créée automatiquement au premier démarrage
       # Défaut : cats_dogs_db (si DB_NAME absent du .env)
       
@@ -97,7 +97,7 @@ services:
     volumes:
       # 💾 VOLUMES : Persistance et initialisation
       
-      - postgres_data:/var/lib/postgresql/data #postgres_data_${STUDENT_ID:-student01}:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data #postgres_data_${STUDENT_ID:-student02}:/var/lib/postgresql/data
       # 📦 Volume nommé (géré par Docker) pour PERSISTANCE des données
       # /var/lib/postgresql/data = répertoire standard des données PostgreSQL
       # ✅ Survit aux redémarrages et suppressions de conteneur
@@ -164,7 +164,7 @@ services:
       # 📄 Chemin relatif au contexte (..) du Dockerfile à utiliser
       # Séparation propre : configs Docker dans docker/, code dans src/
     
-    container_name: cv_cats_dogs_app_${STUDENT_ID:-student01}
+    container_name: cv_cats_dogs_app_${STUDENT_ID:-student02}
     restart: unless-stopped
     
     env_file:
@@ -185,7 +185,7 @@ services:
       # Différent du port exposé à l'hôte (5433)
       # Communication inter-conteneurs = rapide (pas de NAT)
       
-      DB_NAME: ${DB_NAME:-cats_dogs_db}_${STUDENT_ID:-student01}
+      DB_NAME: ${DB_NAME:-cats_dogs_db}_${STUDENT_ID:-student02}
       DB_USER: ${DB_USER:-catsdogs}
       DB_PWD: ${DB_PWD}
       # 🔐 Même configuration que postgres (cohérence)
@@ -208,7 +208,7 @@ services:
       # Optionnel (valeur vide = notifications désactivées)
       # Format : https://discord.com/api/webhooks/{id}/{token}
 
-      STUDENT_ID: ${STUDENT_ID:-student01}
+      STUDENT_ID: ${STUDENT_ID:-student02}
     
     ports:
       - "${STUDENT_PORT_API:-8000}:8000"
@@ -289,7 +289,7 @@ services:
     # 📦 Image officielle Prometheus (maintenue par la CNCF)
     # :latest = dernière version stable (alternative : tag spécifique pour prod)
     
-    container_name: cv_prometheus_${STUDENT_ID:-student01}
+    container_name: cv_prometheus_${STUDENT_ID:-student02}
     restart: unless-stopped
     
     command:
@@ -331,7 +331,7 @@ services:
       # Exemple : alert si latence > 2s pendant 5min
       # Format : groupes de règles avec expressions PromQL
       
-      - prometheus_data:/prometheus #prometheus_data_${STUDENT_ID:-student01}:/prometheus
+      - prometheus_data:/prometheus #prometheus_data_${STUDENT_ID:-student02}:/prometheus
       # 💾 Volume nommé pour TSDB (persistance des métriques)
       # Taille : croît linéairement avec le nombre de métriques et la rétention
       # ⚠️ Définir une politique de rétention (défaut : 15 jours)
@@ -367,7 +367,7 @@ services:
     image: grafana/grafana:latest
     # 📦 Image officielle Grafana Labs
     
-    container_name: cv_grafana_${STUDENT_ID:-student01}
+    container_name: cv_grafana_${STUDENT_ID:-student02}
     restart: unless-stopped
     
     environment:
@@ -398,7 +398,7 @@ services:
       DB_NAME: ${DB_NAME:-cats_dogs_db}
       DB_USER: ${DB_USER:-catsdogs}
       DB_PWD: ${DB_PWD}
-      STUDENT_ID: ${STUDENT_ID:-student01}
+      STUDENT_ID: ${STUDENT_ID:-student02}
     
     ports:
       - "${STUDENT_PORT_GRAFANA:-3000}:3000"
@@ -429,7 +429,7 @@ services:
       # Contient : règles d'alerte, contact points (Discord), notification policies
       # Format : fichiers .yml avec définition des alertes
       
-      - grafana_data:/var/lib/grafana #grafana_data_${STUDENT_ID:-student01}:/var/lib/grafana
+      - grafana_data:/var/lib/grafana #grafana_data_${STUDENT_ID:-student02}:/var/lib/grafana
       # 💾 Volume nommé pour persistance
       # Contient : sessions utilisateurs, annotations, configurations modifiées via UI
       # 💡 Les dashboards provisionnés sont read-only (modifs UI perdues au redémarrage)
@@ -473,12 +473,12 @@ services:
 # 💡 RÈGLE D'OR : Données → volumes nommés, Config → bind mounts
 # ═══════════════════════════════════════════════════════════════════════════════
 volumes:
-  postgres_data: #postgres_data_${STUDENT_ID:-student01}:
+  postgres_data: #postgres_data_${STUDENT_ID:-student02}:
     # 💾 Données PostgreSQL (tables, index, WAL logs)
     # Taille : varie selon volume de feedbacks (ex: 100MB pour 100k prédictions)
     # Backup : docker run --rm -v postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres.tar.gz /data
     
-  prometheus_data: #prometheus_data_${STUDENT_ID:-student01}:
+  prometheus_data: #prometheus_data_${STUDENT_ID:-student02}:
     # 📈 Time-series Prometheus (chunks compressés)
     # Taille : dépend de (nombre_métriques × scrape_interval × retention)
     # Exemple : 100 métriques × 15s scrape × 30j retention ≈ 500MB
@@ -522,7 +522,7 @@ volumes:
 # ═══════════════════════════════════════════════════════════════════════════════
 networks:
   default:
-    name: cv_mlops_network_${STUDENT_ID:-student01}
+    name: cv_mlops_network_${STUDENT_ID:-student02}
     # 🏷️ Nom custom du réseau (remplace {projet}_default)
     # Avantages :
     #   - Lisibilité (docker network ls)
