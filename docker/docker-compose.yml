@@ -105,7 +105,7 @@ services:
       
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
       # 🎬 Script d'initialisation exécuté AU PREMIER DÉMARRAGE uniquement
-      # /docker-entrypoint-initdb.d/ = répertoire magique PostgreSQL
+      # /docker-entrypoint-initdb.d/= répertoire magique PostgreSQL
       # :ro = read-only (bonne pratique sécurité)
       # 💡 Utilise pour créer schéma, tables, index initiaux
       # ⚠️ Ne se réexécute PAS si la base existe déjà (cf. postgres_data)
