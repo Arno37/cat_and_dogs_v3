@@ -74,9 +74,9 @@ services:
       # Syntaxe : ${VARIABLE:-valeur_par_defaut}
       # Ordre de priorité : 1) .env, 2) valeur par défaut, 3) variable système
       
-      POSTGRES_DB: ${DB_NAME:-cats_dogs_db}_${STUDENT_ID:-student02}
+      POSTGRES_DB: ${DB_NAME:-cats_dogs_db_student02}
       # 💡 Nom de la base créée automatiquement au premier démarrage
-      # Défaut : cats_dogs_db (si DB_NAME absent du .env)
+      # Défaut : cats_dogs_db_student02 (cohérent avec .env)
       
       POSTGRES_USER: ${DB_USER:-catsdogs}
       # 💡 Utilisateur propriétaire de la base (droits admin sur cette DB)
@@ -87,7 +87,7 @@ services:
       # Si absent → erreur au démarrage (sécurité by design)
     
     ports:
-      - "${STUDENT_PORT_POSTGRES:-5433}:5432"
+      - "${STUDENT_PORT_POSTGRES:-5435}:5432"
     # 🌐 MAPPING DE PORTS : hôte:conteneur
     # - 5433 (hôte) : port externe pour accès local (évite conflit si PostgreSQL déjà installé sur 5432)
     # - 5432 (conteneur) : port interne standard PostgreSQL
@@ -168,7 +168,7 @@ services:
     restart: unless-stopped
     
     env_file:
-      - ../.env
+      - ./.env
     
     environment:
       # 🗄️ CONFIGURATION BASE DE DONNÉES
@@ -185,7 +185,7 @@ services:
       # Différent du port exposé à l'hôte (5433)
       # Communication inter-conteneurs = rapide (pas de NAT)
       
-      DB_NAME: ${DB_NAME:-cats_dogs_db}_${STUDENT_ID:-student02}
+      DB_NAME: ${DB_NAME:-cats_dogs_db_student02}
       DB_USER: ${DB_USER:-catsdogs}
       DB_PWD: ${DB_PWD}
       # 🔐 Même configuration que postgres (cohérence)
