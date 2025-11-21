@@ -92,7 +92,6 @@ track_prediction = None
 track_feedback = None
 update_db_status = None
 track_inference_time = None
-track_user_feedback = None  # 🆕 Suivi feedback utilisateur (Prometheus)
 inference_duration = None  # 🆕 Histogramme temps inférence
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -105,7 +104,6 @@ if ENABLE_PROMETHEUS:
             track_inference_time,
             update_last_inference,
             inc_http_request,  # 🆕 AJOUT
-            track_user_feedback,
             update_db_status,
             inference_duration,
             track_feedback

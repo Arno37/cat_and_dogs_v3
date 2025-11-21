@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
+import psycopg2
 #from urllib.parse import quote_plus
 
 # Ajouter le répertoire racine au path
@@ -42,6 +43,17 @@ def get_db():
 def get_db_session():
     """Obtenir une session de base de données (utilisation directe)"""
     return SessionLocal()
+
+def get_db_connection():
+    """Obtenir une connexion psycopg2 directe (pour queries SQL brutes)"""
+    from config.settings import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PWD
+    return psycopg2.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PWD
+    )
 
 def test_connection():
     """Tester la connexion à la base de données"""
