@@ -81,6 +81,66 @@ groups:
           #   4. Check disk space: df -h
           # runbook_url: "https://wiki/runbooks/postgres-down"
 
+      # ═══════════════════════════════════════════════════════════════════════
+      # 🚨 ALERTE 2 : Latence d'inférence élevée
+      # ═══════════════════════════════════════════════════════════════════════
+      - alert: HighInferenceLatency
+        expr: rate(cv_inference_duration_seconds_sum[5m]) / rate(cv_inference_duration_seconds_count[5m]) > 2
+        # 🔍 EXPRESSION HISTOGRAMME
+        # Calcul de la moyenne sur 5 minutes :
+        #   _sum : somme cumulée des observations
+        #   _count : nombre d'observations
+        #   Moyenne = sum / count
+        #
+        # 💡 SEUIL 2 secondes
+        # - Utilisateurs remarquent latence > 1s
+        # - Seuil 2s = warning (avant que utilisateurs se plaignent)
+        # - Ajuster selon SLA contractuel (ex: P95 < 1s)
+        #
+        # 📊 EXEMPLE DONNÉES
+        # Si en 5 min : 100 prédictions, temps total 150s
+        # → Moyenne = 150 / 100 = 1.5s (pas d'alerte)
+        # Si 200s total → Moyenne = 200 / 100 = 2s (déclenche alerte)
+        
+        for: 2m
+        # ⏰ Attendre 2 minutes avant alerte
+        # Tolère pics courts de latence (peut être dû aux ressources)
+        # Mais si soutenu > 2min → problème réel
+        
+        labels:
+          severity: warning
+          # 🟡 WARNING (non-critical) car :
+          # - App fonctionne, juste lente
+          # - Utilisateurs impactés mais pas bloqués
+          # - Peut être dû à charge momentanée (pas défaut de code)
+        
+        annotations:
+          summary: "Latence d'inférence élevée détectée"
+          description: "Latence moyenne > 2s pendant 2 minutes"
+          # 💡 ENRICHISSEMENT POSSIBLE
+          # description: |
+          #   Moyenne latence : {{ $value | humanize }}s
+          #   Seuil : 2s
+          #   Durée : {{ $activeAt | humanizeDuration }}
+          #   Actions :
+          #   1. Vérifier charge CPU : docker stats cv_app
+          #   2. Vérifier GPU si disponible (CUDA) : nvidia-smi
+          #   3. Vérifier mémoire disponible
+          #   4. Analyser requêtes lentes : docker logs cv_app | grep inference_time_ms
+          # runbook_url: "https://wiki/runbooks/high-latency"
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # 🚨 ALERTE 4 : Latence d'inférence élevée (métrique cv_inferencetime_ms)
+      # ═══════════════════════════════════════════════════════════════════════
+      - alert: HighInferenceLatency
+        expr: cv_inferencetime_ms > 1000
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Inference latency is too high"
+          description: "Inference time {{ $value }}ms exceeds threshold of 1000ms"
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 🎓 CONCEPTS AVANCÉS (non implémentés, pour aller plus loin)
 # ═══════════════════════════════════════════════════════════════════════════
