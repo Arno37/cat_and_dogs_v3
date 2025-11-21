@@ -246,7 +246,7 @@ curl http://localhost:8000/metrics
 # Base de données
 DB_HOST=postgres
 DB_PORT=5432
-DB_NAME=cats_dogs_db
+DB_NAME=cats_dogs_db_student02
 DB_USER=catsdogs
 DB_PWD=votre_mot_de_passe_securise
 DB_TABLE_MONITORING=predictions_feedback

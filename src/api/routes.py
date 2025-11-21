@@ -49,6 +49,7 @@ sys.path.insert(0, str(ROOT_DIR))
 # 📦 IMPORTS CORE (toujours actifs, V2 conservée)
 # ─────────────────────────────────────────────────────────────────────────────
 from .auth import verify_token  # 🔐 Authentification JWT/Bearer
+from .models import FeedbackRequest  # 📝 Schéma validation feedback
 from src.models.predictor import CatDogPredictor  # 🧠 Modèle CNN
 
 # Base de données (PostgreSQL)
@@ -71,7 +72,7 @@ from src.monitoring.dashboard_service import DashboardService  # 📈 Graphiques
 # ✅ Rollback facile (désactiver via .env si problème)
 # ✅ Environnements différents (Prometheus en prod, pas en dev)
 
-ENABLE_PROMETHEUS = os.getenv('ENABLE_PROMETHEUS', 'false').lower() == 'true'
+ENABLE_PROMETHEUS = os.getenv('ENABLE_PROMETHEUS', 'true').lower() == 'true'
 # 📊 Flag activation Prometheus (lu depuis .env)
 # Défaut : false (cohérent avec principe opt-in)
 
@@ -90,6 +91,9 @@ notifier = None
 track_prediction = None
 track_feedback = None
 update_db_status = None
+track_inference_time = None
+track_user_feedback = None  # 🆕 Suivi feedback utilisateur (Prometheus)
+inference_duration = None  # 🆕 Histogramme temps inférence
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 📊 IMPORT PROMETHEUS (si activé)
@@ -97,13 +101,18 @@ update_db_status = None
 if ENABLE_PROMETHEUS:
     try:
         from src.monitoring.prometheus_metrics import (
-            update_db_status as _update_db_status   # Gauge database_status
+            track_prediction,
+            track_inference_time,
+            update_last_inference,
+            inc_http_request,  # 🆕 AJOUT
+            track_user_feedback,
+            update_db_status,
+            inference_duration,
+            track_feedback
         )
-        # 🔄 Renommage avec underscore pour éviter shadowing (bonne pratique)
-        update_db_status = _update_db_status
         print("✅ Prometheus tracking functions loaded")
     except ImportError as e:
-        ENABLE_PROMETHEUS = False  # Désactivation silencieuse
+        ENABLE_PROMETHEUS = False
         print(f"⚠️  Prometheus tracking not available: {e}")
         # 💡 Graceful degradation : app continue sans Prometheus
 
@@ -218,7 +227,7 @@ async def inference_page(request: Request):
 @router.post("/api/predict", tags=["🧠 Inférence"])
 async def predict_api(
     file: UploadFile = File(...),
-    rgpd_consent: bool = Form(False),
+    rgpd_consent: bool = Form(True),
     token: str = Depends(verify_token),  # 🔐 Authentification requise
     db: Session = Depends(get_db)       # 🗄️ Injection session DB
 ):
@@ -269,6 +278,8 @@ async def predict_api(
         # ─────────────────────────────────────────────────────────────────────
         # 📸 LECTURE ET PRÉDICTION
         # ─────────────────────────────────────────────────────────────────────
+        import sys
+        print("🔬 DÉBUT PREDICTION", file=sys.stderr, flush=True)
         image_data = await file.read()
         # 📥 Lecture asynchrone du fichier uploadé (bytes)
         
@@ -285,6 +296,7 @@ async def predict_api(
         # ─────────────────────────────────────────────────────────────────────
         end_time = time.perf_counter()
         inference_time_ms = int((end_time - start_time) * 1000)
+        
         # Conversion secondes → millisecondes (plus lisible pour latence)
         # Typage int : évite JSON avec .567823478 ms
         
@@ -311,7 +323,48 @@ async def predict_api(
             user_comment=None
         )
         
-        #update_db_status(True)
+        # ─────────────────────────────────────────────────────────────────────
+        # 📊 TRACKING PROMETHEUS (V3 - nouveau)
+        # ─────────────────────────────────────────────────────────────────────
+        import sys
+        print(f"🔍 DEBUG: ENABLE_PROMETHEUS={ENABLE_PROMETHEUS}, track_prediction={track_prediction is not None}, track_inference_time={track_inference_time is not None}", file=sys.stderr, flush=True)
+        if ENABLE_PROMETHEUS:
+            try:
+                # If only inference latency should be recorded (no full prediction tracking)
+                if track_inference_time and not track_prediction:
+                    print(f"📊 Tracking inference time only: {inference_time_ms}ms", file=sys.stderr, flush=True)
+                    track_inference_time(inference_time_ms / 1000.0)  # Convert ms to seconds
+                    print("✅ Prometheus inference-time tracking successful", file=sys.stderr, flush=True)
+
+                # If full prediction tracking is available, use it (it already records inference time)
+                if track_prediction:
+                    print(f"📊 Tracking prediction: {result['prediction'].lower()}, {inference_time_ms}ms, {result['confidence']}", file=sys.stderr, flush=True)
+                    track_prediction(
+                        result=result["prediction"].lower(),
+                        inference_time_ms=inference_time_ms,
+                        confidence=result['confidence'],
+                        success=True
+                    )
+                    print("✅ Prometheus tracking successful", file=sys.stderr, flush=True)
+            except Exception as e:
+                print(f"⚠️  Prometheus tracking failed: {e}", file=sys.stderr, flush=True)
+                import traceback
+                traceback.print_exc(file=sys.stderr)
+                # Non-bloquant : on continue même si tracking échoue
+        
+        # Mesure du temps d'inférence
+        inference_duration = end_time - start_time
+
+        # ═════════════════════════════════════════════════════════════════════
+        # 🆕 📊 TRACKING PROMETHEUS - Dernière latence
+        # ═════════════════════════════════════════════════════════════════════
+        if ENABLE_PROMETHEUS and update_last_inference:
+            try:
+                update_last_inference(inference_duration)
+                print(f"✅ Updated last inference gauge: {inference_duration:.3f}s", file=sys.stderr, flush=True)
+            except Exception as e:
+                print(f"⚠️  Failed to update last inference: {e}", file=sys.stderr, flush=True)
+
         # 📝 Retourne objet ORM PredictionFeedback avec .id auto-généré
         
         # ─────────────────────────────────────────────────────────────────────
@@ -329,6 +382,13 @@ async def predict_api(
             "feedback_id": feedback_record.id  # Pour update feedback ultérieur
         }
         
+        # Utilisation dans le handler POST /api/predict
+        if ENABLE_PROMETHEUS:
+            try:
+                inc_http_request("POST", "/api/predict")
+            except Exception:
+                pass
+
         return response_data
         
     except Exception as e:
@@ -352,6 +412,19 @@ async def predict_api(
                 user_feedback=None,
                 user_comment=str(e)  # Stockage message erreur
             )
+            
+            # 📊 TRACKING PROMETHEUS - Erreurs
+            if ENABLE_PROMETHEUS and track_prediction:
+                try:
+                    track_prediction(
+                        result="error",
+                        inference_time_ms=inference_time_ms,
+                        confidence=0.0,
+                        success=False
+                    )
+                except:
+                    pass  # Silencieux pour éviter erreur dans erreur
+                    
         except:
             pass  # Double échec = on abandonne (évite cascade)
         
@@ -363,35 +436,25 @@ async def predict_api(
 
 @router.post("/api/update-feedback", tags=["📊 Monitoring"])
 async def update_feedback(
-    feedback_id: int = Form(...),        # ID de la prédiction (retourné par /predict)
-    user_feedback: int = Form(None),     # 0 = insatisfait, 1 = satisfait
-    user_comment: str = Form(None),      # Commentaire libre (optionnel)
+    feedback_id: int = Form(...),
+    user_feedback: int = Form(None),
+    user_comment: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """
     Mise à jour du feedback utilisateur post-prédiction
     
-    🔄 WORKFLOW TYPIQUE
-    1. User voit prédiction dans UI
-    2. User clique 👍 (satisfied) ou 👎 (unsatisfied)
-    3. [Optionnel] User ajoute commentaire
-    4. Frontend POST /api/update-feedback avec feedback_id
-    5. Backend met à jour record existant en DB
-    6. 🆕 V3 : Tracking dans Prometheus (user_feedback_total)
+    🔄 WORKFLOW
+    1. User voit prédiction
+    2. User clique 👍 (1) ou 👎 (0)
+    3. Frontend POST /api/update-feedback
+    4. Backend met à jour DB + Prometheus
     
     Args:
-        feedback_id: ID de l'enregistrement PredictionFeedback
-        user_feedback: 0 ou 1 (binaire pour simplicité)
-        user_comment: Texte libre (ex: "Image floue", "Bonne prédiction")
+        feedback_id: ID de la prédiction
+        user_feedback: 0 (négatif) ou 1 (positif)
+        user_comment: Commentaire optionnel
         db: Session SQLAlchemy
-    
-    Returns:
-        JSON confirmation {"success": true, "message": "..."}
-    
-    Raises:
-        HTTPException 404: Feedback_id inexistant
-        HTTPException 403: RGPD non accepté (pas de stockage feedback)
-        HTTPException 400: user_feedback invalide (≠ 0 ou 1)
     """
     try:
         from src.database.models import PredictionFeedback
@@ -415,11 +478,8 @@ async def update_feedback(
         if not record.rgpd_consent:
             raise HTTPException(
                 status_code=403,
-                detail="Consentement RGPD non accepté. Impossible de stocker le feedback."
+                detail="Consentement RGPD non accepté"
             )
-            # 💡 LOGIQUE RGPD
-            # - Si consent=False à la prédiction → pas de mise à jour feedback
-            # - Respect article 7 RGPD (consentement spécifique et éclairé)
         
         # ─────────────────────────────────────────────────────────────────────
         # ✏️ MISE À JOUR DES CHAMPS
@@ -438,14 +498,59 @@ async def update_feedback(
         # 💾 Commit en base
         db.commit()
         
+        # ═════════════════════════════════════════════════════════════════════
+        # 🆕 📊 TRACKING PROMETHEUS
+        # ═════════════════════════════════════════════════════════════════════
+        if ENABLE_PROMETHEUS and track_user_feedback:
+            try:
+                # Convertir 0/1 en label 'negative'/'positive'
+                feedback_type = 'positive' if user_feedback == 1 else 'negative'
+                track_user_feedback(feedback_type)
+                print(f"✅ Feedback tracked: {feedback_type}")
+            except Exception as e:
+                print(f"⚠️  Prometheus feedback tracking failed: {e}")
+                # Non-bloquant : on continue même si tracking échoue
+        
+        return {
+            "success": True,
+            "message": "Feedback mis à jour avec succès",
+            "feedback_id": feedback_id
+        }
+        
     except HTTPException:
-        raise  # Propage les HTTPException définies ci-dessus
+        raise
     except Exception as e:
-        db.rollback()  # Annule transaction en cas d'erreur
+        db.rollback()
         raise HTTPException(
             status_code=500,
             detail=f"Erreur lors de la mise à jour: {str(e)}"
         )
+
+@router.post("/feedback")
+async def submit_feedback(feedback: FeedbackRequest):
+    """
+    Endpoint pour soumettre du feedback utilisateur.
+    Met à jour les métriques Prometheus après sauvegarde.
+    """
+    try:
+        # Sauvegarder feedback en DB
+        db = get_db()
+        feedback_obj = UserFeedback(
+            prediction_id=feedback.prediction_id,
+            is_positive=feedback.is_positive,
+            comment=feedback.comment
+        )
+        db.add(feedback_obj)
+        db.commit()
+        
+        # 🚨 METTRE À JOUR LES MÉTRIQUES
+        track_feedback()
+        
+        return {"status": "feedback_recorded", "message": "Merci pour votre feedback !"}
+    
+    except Exception as e:
+        print(f"❌ Error submitting feedback: {e}", file=sys.stderr, flush=True)
+        raise HTTPException(status_code=500, detail="Failed to save feedback")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 📊 API STATISTIQUES & MONITORING

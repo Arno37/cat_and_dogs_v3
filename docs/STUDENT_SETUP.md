@@ -2,17 +2,17 @@
 
 ## Votre Identifiant
 
-Vous avez été assigné : **STUDENTXX** (remplacer XX par votre numéro)
+Vous avez été assigné : **STUDENT02** (remplacer XX par votre numéro)
 
 ## URLs d'Accès
 
 Après déploiement, vos services seront accessibles sur :
 
-- 🔧 **API FastAPI** : http://51.91.251.234:80XX
-- 📊 **Grafana** : http://51.91.251.234:30XX  
-- 📈 **Prometheus** : http://51.91.251.234:90XX
+- 🔧 **API FastAPI** : http://51.91.251.234:8002
+- 📊 **Grafana** : http://51.91.251.234:3002  
+- 📈 **Prometheus** : http://51.91.251.234:9092
 
-*Exemple pour student01 : http://51.91.251.234:8001*
+*Exemple pour student01 : http://51.91.251.234:8002*
 
 ## Tableau des Ports Assignés
 

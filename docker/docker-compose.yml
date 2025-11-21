@@ -74,7 +74,7 @@ services:
       # Syntaxe : ${VARIABLE:-valeur_par_defaut}
       # Ordre de priorité : 1) .env, 2) valeur par défaut, 3) variable système
       
-      POSTGRES_DB: ${DB_NAME:-cats_dogs_db_student02}
+      POSTGRES_DB: cats_dogs_db
       # 💡 Nom de la base créée automatiquement au premier démarrage
       # Défaut : cats_dogs_db_student02 (cohérent avec .env)
       
@@ -87,7 +87,7 @@ services:
       # Si absent → erreur au démarrage (sécurité by design)
     
     ports:
-      - "${STUDENT_PORT_POSTGRES:-5435}:5432"
+      - "0.0.0.0:${STUDENT_PORT_POSTGRES}:5432"
     # 🌐 MAPPING DE PORTS : hôte:conteneur
     # - 5433 (hôte) : port externe pour accès local (évite conflit si PostgreSQL déjà installé sur 5432)
     # - 5432 (conteneur) : port interne standard PostgreSQL
@@ -160,7 +160,7 @@ services:
       # Permet d'accéder à src/, requirements/, models/ lors du build
       # Le Dockerfile peut alors COPY ../src → /app/src
       
-      dockerfile: docker/Dockerfile.app
+      dockerfile: ./docker/Dockerfile.app
       # 📄 Chemin relatif au contexte (..) du Dockerfile à utiliser
       # Séparation propre : configs Docker dans docker/, code dans src/
     
@@ -172,20 +172,13 @@ services:
     
     environment:
       # 🗄️ CONFIGURATION BASE DE DONNÉES
-      # Variables passées à l'application FastAPI
       
       DB_HOST: postgres
-      # 🌐 Hostname du service PostgreSQL
-      # 💡 Docker Compose crée un réseau interne avec résolution DNS automatique
-      # "postgres" = nom du service → résolu vers IP interne du conteneur
-      # ⚠️ NE PAS utiliser localhost (= conteneur lui-même) ni 127.0.0.1
-      
       DB_PORT: 5432
-      # 🔌 Port INTERNE (dans le réseau Docker)
-      # Différent du port exposé à l'hôte (5433)
-      # Communication inter-conteneurs = rapide (pas de NAT)
       
-      DB_NAME: ${DB_NAME:-cats_dogs_db_student02}
+      # 👇 CHANGE ICI AUSSI
+      DB_NAME: cats_dogs_db
+      
       DB_USER: ${DB_USER:-catsdogs}
       DB_PWD: ${DB_PWD}
       # 🔐 Même configuration que postgres (cohérence)
@@ -211,7 +204,7 @@ services:
       STUDENT_ID: ${STUDENT_ID:-student02}
     
     ports:
-      - "${STUDENT_PORT_API:-8000}:8000"
+      - "0.0.0.0:${STUDENT_PORT_API}:8000"
       # 🌐 Port de l'API FastAPI (standard FastAPI)
       # Accessible depuis : http://localhost:8000
       # 💡 Un seul port car hôte = conteneur (pas de conflit potentiel)
@@ -292,6 +285,11 @@ services:
     container_name: cv_prometheus_${STUDENT_ID:-student02}
     restart: unless-stopped
     
+    ports:
+      - "0.0.0.0:${STUDENT_PORT_PROMETHEUS}:9090"
+      # 🌐 Interface web Prometheus
+      # Accessible : http://localhost:9090
+    
     command:
       # 🚀 Arguments passés au démarrage de Prometheus
       # Overwrite la commande par défaut de l'image
@@ -309,11 +307,6 @@ services:
       # 🔄 Active l'endpoint HTTP POST /-/reload pour rechargement config
       # Utile pour mettre à jour prometheus.yml sans redémarrage
       # Exemple : curl -X POST http://localhost:9090/-/reload
-    
-    ports:
-      - "${STUDENT_PORT_PROMETHEUS:-9090}:9090"
-      # 🌐 Interface web Prometheus
-      # Accessible : http://localhost:9090
       # Fonctionnalités :
       #   - /graph : requêtes PromQL et graphiques ad-hoc
       #   - /targets : statut des endpoints scrapés
@@ -401,7 +394,7 @@ services:
       STUDENT_ID: ${STUDENT_ID:-student02}
     
     ports:
-      - "${STUDENT_PORT_GRAFANA:-3000}:3000"
+      - "0.0.0.0:${STUDENT_PORT_GRAFANA}:3000"
       # 🌐 Interface web Grafana
       # Accessible : http://localhost:3000
       # Login : admin / admin (première fois)
@@ -551,7 +544,7 @@ networks:
 #
 # DÉBOGAGE
 #   docker compose exec cv_app bash         # Shell interactif dans le conteneur
-#   docker compose exec postgres psql -U catsdogs -d cats_dogs_db  # Client PostgreSQL
+#   docker compose exec postgres psql -U catsdogs -d cats_dogs_db_student02  # Client PostgreSQL
 #   docker compose top                      # Processus en cours dans chaque conteneur
 #
 # NETTOYAGE

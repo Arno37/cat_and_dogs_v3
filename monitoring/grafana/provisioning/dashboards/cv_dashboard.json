@@ -18,9 +18,75 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
+  "id": 2,
   "links": [],
   "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 0.2
+              },
+              {
+                "color": "red",
+                "value": 0.3
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "12.2.1",
+      "targets": [
+        {
+          "editorMode": "builder",
+          "expr": "cv_last_inference_seconds{instance=\"cv_app:8000\"}",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "inferencetime__ms",
+      "type": "gauge"
+    },
     {
       "datasource": {
         "type": "prometheus",
@@ -61,12 +127,13 @@
               }
             ]
           }
-        }
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 0
       },
       "id": 1,
@@ -75,6 +142,7 @@
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -82,6 +150,7 @@
           "fields": "",
           "values": false
         },
+        "showPercentChange": false,
         "textMode": "value",
         "wideLayout": true
       },
@@ -101,50 +170,68 @@
     },
     {
       "datasource": {
-        "type": "postgres",
-        "uid": "postgres"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
+          "color": {
+            "mode": "thresholds"
           },
-          "mappings": []
-        }
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 8
       },
-      "id": 2,
+      "id": 4,
       "options": {
-        "cellHeight": "sm",
-        "showHeader": true
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "12.2.1",
       "targets": [
         {
-          "datasource": {
-            "type": "postgres",
-            "uid": "postgres"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT created_at, prediction_result, ROUND(proba_cat::numeric, 2) as proba_cat, ROUND(proba_dog::numeric, 2) as proba_dog FROM predictions_feedback ORDER BY created_at DESC LIMIT 10",
+          "expr": "sum by (method) (http_requests_total{instance=\"cv_app:8000\"})",
+          "legendFormat": "{{method}}",
           "refId": "A"
         }
       ],
-      "title": "📊 Dernières Prédictions",
-      "type": "table"
+      "title": "Requêtes HTTP (GET vs POST)",
+      "type": "stat"
     }
   ],
+  "preload": false,
   "refresh": "10s",
   "schemaVersion": 42,
   "tags": [
@@ -163,5 +250,5 @@
   "timezone": "",
   "title": "Computer Vision - Cats & Dogs (Workshop)",
   "uid": "cv-cats-dogs-workshop",
-  "version": 1
+  "version": 39
 }

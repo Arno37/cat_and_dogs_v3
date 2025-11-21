@@ -3,14 +3,13 @@
 CREATE USER catsdogs WITH PASSWORD '?C@TS&D0GS!';
 
 -- Création de la base de données
-CREATE DATABASE cats_dogs_db OWNER catsdogs;
+CREATE DATABASE cats_dogs_db_student02 OWNER catsdogs;
 */
 
 -- Attribution de tous les privilèges sur la base de données
-GRANT ALL PRIVILEGES ON DATABASE cats_dogs_db TO catsdogs;
-
+GRANT ALL PRIVILEGES ON DATABASE cats_dogs_db_student02 TO catsdogs;
 -- Se connecter à la nouvelle base de données pour les privilèges sur le schéma
-\c cats_dogs_db;
+\c cats_dogs_db_student02;
 
 -- Attribution des privilèges sur le schéma public
 GRANT ALL PRIVILEGES ON SCHEMA public TO catsdogs;

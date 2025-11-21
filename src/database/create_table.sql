@@ -1,5 +1,5 @@
 -- Se connecter à la base de données
-\c cats_dogs_db;
+\c cats_dogs_db_student02;
 
 -- Table pour stocker les métriques de prédictions avec feedback
 CREATE TABLE IF NOT EXISTS predictions_feedback (

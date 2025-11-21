@@ -3,6 +3,9 @@ from fastapi.staticfiles import StaticFiles
 import sys
 from pathlib import Path
 import os
+from apscheduler.schedulers.background import BackgroundScheduler
+from src.monitoring.prometheus_metrics import track_feedback
+import atexit
 
 # Ajouter le répertoire racine au path
 ROOT_DIR = Path(__file__).parent.parent.parent
@@ -21,7 +24,17 @@ if ENABLE_PROMETHEUS:
         print("⚠️  Prometheus metrics not available (install requirements/monitoring.txt)")
         ENABLE_PROMETHEUS = False
 
+# 🔄 Scheduler pour mettre à jour métriques feedback chaque minute
+scheduler = BackgroundScheduler()
 
+def scheduled_track_feedback():
+    """Tâche schedulée toutes les minutes"""
+    try:
+        track_feedback()
+    except Exception as e:
+        print(f"⚠️ Scheduled feedback tracking failed: {e}", file=sys.stderr, flush=True)
+
+# ✅ CRÉER app AVANT d'utiliser @app.on_event()
 app = FastAPI(
     title="🐱🐶 Cats vs Dogs Classifier",
     description="""
@@ -104,6 +117,21 @@ if ENABLE_PROMETHEUS:
 
 # Ajouter les routes
 app.include_router(router)
+
+# ✅ EVENT HANDLERS - Maintenant app est défini
+@app.on_event("startup")
+async def startup_event():
+    scheduler.add_job(scheduled_track_feedback, 'interval', minutes=1, id='track_feedback')
+    scheduler.start()
+    print("✅ Feedback tracking scheduler started", file=sys.stderr, flush=True)
+
+# Arrêter proprement
+@app.on_event("shutdown")
+async def shutdown_event():
+    scheduler.shutdown()
+    print("✅ Feedback tracking scheduler stopped", file=sys.stderr, flush=True)
+
+atexit.register(lambda: scheduler.shutdown())
 
 # Optionnel : servir des fichiers statiques
 STATIC_DIR = ROOT_DIR / "src" / "web" / "static"

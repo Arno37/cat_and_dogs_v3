@@ -111,29 +111,85 @@ prediction_confidence = Histogram(
 # - histogram_quantile(0.5, cv_prediction_confidence) : médiane confiance
 
 # 🆕 FEEDBACK UTILISATEUR
-cv_user_feedback_total = Counter(
-    'cv_user_feedback_total',
-    'Nombre de feedbacks utilisateurs collectés',
-    ['feedback_type']  # 'positive' ou 'negative'
+cv_user_feedback_positive = Gauge(
+    'cv_user_feedback_positive',
+    'Total positive feedbacks (thumbs up)',
+    labelnames=['result']  # Labels: cat, dog
 )
 
-def track_user_feedback(feedback_type: str):
+cv_user_feedback_negative = Gauge(
+    'cv_user_feedback_negative',
+    'Total negative feedbacks (thumbs down)',
+    labelnames=['result']  # Labels: cat, dog
+)
+
+cv_user_feedback_total = Gauge(
+    'cv_user_feedback_total',
+    'Total feedbacks collected (positive + negative)',
+    labelnames=['result']
+)
+
+def track_feedback():
     """
-    Enregistre un feedback utilisateur
-    
-    Args:
-        feedback_type: 'positive' (1) ou 'negative' (0)
+    Récupère les feedbacks de la DB et met à jour les métriques.
+    À appeler toutes les X secondes (via scheduling).
     """
     try:
-        valid_types = ['positive', 'negative']
-        if feedback_type not in valid_types:
-            print(f"⚠️  Invalid feedback_type: {feedback_type}. Expected: {valid_types}")
-            return
+        from src.database.db_connector import get_db_connection
         
-        cv_user_feedback_total.labels(feedback_type=feedback_type).inc()
-        print(f"✅ Tracked user feedback: {feedback_type}")
+        connection = get_db_connection()
+        cursor = connection.cursor()
+        
+        # 📊 Query 1: Feedbacks positifs par classe
+        cursor.execute("""
+            SELECT 
+                p.result,
+                COUNT(*) as count
+            FROM user_feedback uf
+            JOIN predictions p ON uf.prediction_id = p.id
+            WHERE uf.is_positive = TRUE
+            GROUP BY p.result
+        """)
+        
+        for result, count in cursor.fetchall():
+            cv_user_feedback_positive.labels(result=result).set(count)
+            print(f"✅ Positive feedback ({result}): {count}", file=sys.stderr, flush=True)
+        
+        # 📊 Query 2: Feedbacks négatifs par classe
+        cursor.execute("""
+            SELECT 
+                p.result,
+                COUNT(*) as count
+            FROM user_feedback uf
+            JOIN predictions p ON uf.prediction_id = p.id
+            WHERE uf.is_positive = FALSE
+            GROUP BY p.result
+        """)
+        
+        for result, count in cursor.fetchall():
+            cv_user_feedback_negative.labels(result=result).set(count)
+            print(f"✅ Negative feedback ({result}): {count}", file=sys.stderr, flush=True)
+        
+        # 📊 Query 3: Total feedbacks par classe
+        cursor.execute("""
+            SELECT 
+                p.result,
+                COUNT(*) as count
+            FROM user_feedback uf
+            JOIN predictions p ON uf.prediction_id = p.id
+            GROUP BY p.result
+        """)
+        
+        for result, count in cursor.fetchall():
+            cv_user_feedback_total.labels(result=result).set(count)
+            print(f"✅ Total feedback ({result}): {count}", file=sys.stderr, flush=True)
+        
+        cursor.close()
+        connection.close()
+        print("✅ Feedback metrics updated successfully", file=sys.stderr, flush=True)
+        
     except Exception as e:
-        print(f"⚠️  Failed to track feedback: {e}")
+        print(f"❌ Error tracking feedback: {e}", file=sys.stderr, flush=True)
 
 cv_last_inference_seconds = Gauge(
     'cv_last_inference_seconds',

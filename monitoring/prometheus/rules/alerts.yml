@@ -141,6 +141,24 @@ groups:
           summary: "Inference latency is too high"
           description: "Inference time {{ $value }}ms exceeds threshold of 1000ms"
 
+      # ═══════════════════════════════════════════════════════════════════════
+      # 🚨 ALERTE 5 : Trop de feedbacks négatifs
+      # ═══════════════════════════════════════════════════════════════════════
+      - alert: HighNegativeFeedbackRate
+        expr: |
+          (
+            cv_user_feedback_negative / 
+            (cv_user_feedback_positive + cv_user_feedback_negative)
+          ) > 0.3
+        # Si > 30% des feedbacks sont négatifs = problème modèle
+        
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High negative feedback rate detected"
+          description: "More than 30% of feedbacks are negative - model accuracy may be degraded"
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 🎓 CONCEPTS AVANCÉS (non implémentés, pour aller plus loin)
 # ═══════════════════════════════════════════════════════════════════════════
